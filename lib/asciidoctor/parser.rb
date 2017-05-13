@@ -95,6 +95,7 @@ class Parser
       new_section, block_attributes = next_section(reader, document, block_attributes)
       document << new_section if new_section
     end unless options[:header_only]
+    document.apply_section_label_subs
 
     document
   end
@@ -1604,17 +1605,32 @@ class Parser
       section.numbered = section.special ? (parent.context == :section && parent.numbered) : true
     end
 
-    # generate an ID if one was not embedded or specified as anchor above section title
-    if (id = section.id ||= (attributes['id'] ||
-        ((document.attributes.key? 'sectids') ? (Section.generate_id section.title, document) : nil)))
-      # TODO sub reftext
-      document.register :ids, [id, sect_reftext || section.title]
-    end
+    register_section_ids section, attributes
 
     section.update_attributes(attributes)
     reader.skip_blank_lines
 
     section
+  end
+
+  # Internal: Registers section ids and their origin for use in internal references
+  #
+  # The ids registered here are later substituted by using the :id_origins entry.
+  # See Document#apply_section_label_subs
+  #
+  # section - the section who's ids get registered
+  # attributes - a Hash of attributes to assign to this section (default: {})
+  def self.register_section_ids section, attributes
+    document = section.document
+    # generate an id if one was not embedded or specified as anchor above section title
+    id = (section.id ||= (attributes['id'] || (Section.generate_id section.title, document)))
+
+    # should section-label get a default value? {sectnum} {secttitle}
+    reftext = attributes['reftext'] || document.attributes['section-label'] || section.title
+    if id
+      document.register(:ids, [id, reftext ])
+      document.register(:id_origins, [id, section])
+    end
   end
 
   # Internal: Checks if the next line on the Reader is a section title

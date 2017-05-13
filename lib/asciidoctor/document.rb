@@ -206,6 +206,7 @@ class Document < AbstractBlock
       @parent_document = nil
       @catalog = {
         :ids => {},
+        :id_origins => {},
         :footnotes => [],
         :links => [],
         :images => [],
@@ -560,6 +561,9 @@ class Document < AbstractBlock
     when :ids
       id, reftext = value
       @catalog[:ids][id] ||= (reftext || '[' + id + ']')
+    when :id_origins
+      id, origin = value
+      @catalog[:id_origins][id] = origin
     when :footnotes, :indexterms
       @catalog[type] << value
     else
@@ -892,6 +896,20 @@ class Document < AbstractBlock
       $1 ? (apply_subs $2, (resolve_pass_subs $1)) : $2
     else
       apply_header_subs value
+    end
+  end
+
+  # Internal: apply subs for the section-label attribute
+  #
+  # This has to be an extra step because the substitution can only
+  # be done after the parsing is done and the section sectnums are
+  # set correctly.
+  def apply_section_label_subs
+    catalog[:id_origins].each do |id, section|
+      reftext = catalog[:ids][id]
+      reftext = section.sub_attributes(reftext, { :section_reftext => { :sectnum => section.sectnum, :secttitle => section.title }})
+      # hack because FORCE attribute was removed from Document#register
+      @catalog[:ids][id] = (reftext || '[' + id + ']')
     end
   end
 
